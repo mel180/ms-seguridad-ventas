@@ -18,7 +18,7 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
-import {Usuario} from '../models';
+import {Credenciales, Usuario} from '../models';
 import {UsuarioRepository} from '../repositories';
 import {SeguridadUsuarioService} from '../services';
 
@@ -49,7 +49,7 @@ export class UsuarioController {
     usuario: Omit<Usuario, '_id'>,
   ): Promise<Usuario> {
     // Crear la clave
-    let clave = this.servicioSeguridad.crearClave();
+    let clave = this.servicioSeguridad.crearTextoAleatorio(10);
     // Cifrar la clave
     let claveCifrada = this.servicioSeguridad.cifrarTexto(clave);
     // Asgnar la clave cifrada al usuario
@@ -157,5 +157,32 @@ export class UsuarioController {
   })
   async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.usuarioRepository.deleteById(id);
+  }
+
+  /**
+   * Métodos personalizados para la API
+   */
+
+  @post('/identificar-usuario')
+  @response(200, {
+    description: "Identificar un usuario por correo y clave",
+    content: {'application/json': {schema: getModelSchemaRef(Credenciales)}}
+  })
+  async identificarUsuario(
+    @requestBody(
+      {
+        content: {
+          'application/json': {
+            schema: getModelSchemaRef(Credenciales)
+          }
+        }
+      }
+    )
+    credenciales: Credenciales
+  ) {
+    let usuario = await this.servicioSeguridad.identificarUsuario(credenciales);
+    if (usuario) {
+
+    }
   }
 }
