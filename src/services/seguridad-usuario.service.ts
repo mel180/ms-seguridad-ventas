@@ -1,15 +1,19 @@
 import { /* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
-import {Credenciales, Usuario} from '../models';
-import {UsuarioRepository} from '../repositories';
+import {ConfiguracioSeguridad} from '../config/seguridad.config';
+import {Credenciales, FactorDeAutenticacionPorCodigo, Usuario} from '../models';
+import {LoginRepository, UsuarioRepository} from '../repositories';
 const generator = require('generate-password');
 const MD5 = require("crypto-js/md5");
+const jwt = require('jsonwebtoken');
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SeguridadUsuarioService {
   constructor(
     @repository(UsuarioRepository)
-    public repositorioUusario: UsuarioRepository
+    public repositorioUusario: UsuarioRepository,
+    @repository(LoginRepository)
+    public repositorioLogin: LoginRepository
   ) { }
 
   /**
@@ -47,5 +51,40 @@ export class SeguridadUsuarioService {
       }
     });
     return usuario as Usuario;
+  }
+
+  /**
+   * Valida el codigo 2fa para un usuario
+   * @param credenciales2fa credenciales del usuario con el codigo del 2fa
+   * @returns el registro con el login o null
+   */
+  async validarCodigo2fa(credenciales2fa: FactorDeAutenticacionPorCodigo): Promise<Usuario | null> {
+    let login = await this.repositorioLogin.findOne({
+      where: {
+        usuarioId: credenciales2fa.usuarioId,
+        codigo: credenciales2fa.codigo2fa,
+        estadoCodigo2fa: false
+      }
+    });
+    if (login) {
+      let usuario = await this.repositorioUusario.findById(credenciales2fa.usuarioId);
+      return usuario;
+    }
+    return null;
+  }
+
+  /**
+   * Generacion de jwt
+   * @param usuario Informacion del usuario
+   * @returns token
+   */
+  crearToken(usuario: Usuario): string {
+    let datos = {
+      name: `${usuario.primerNombre} ${usuario.segundoNombre} ${usuario.primerApellido} ${usuario.segundoApellido}`,
+      role: usuario.rolId,
+      email: usuario.correo
+    };
+    let token = jwt.sign(datos, ConfiguracioSeguridad.claveJWT);
+    return token;
   }
 }
